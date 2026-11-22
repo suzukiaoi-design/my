@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>お小遣い帳</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      background-color: #e5e5e5;
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      color: #222;
+      display: flex;
+      justify-content: center;
+    }
+    .app-shell {
+      width: 100%;
+      max-width: 480px;
+      min-height: 100vh;
+      background-color: #ffffff;
+      border-left: 1px solid #bbb;
+      border-right: 1px solid #bbb;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 1. グレーのトップヘッダー */
+    .top-bar {
+      background-color: #9e9e9e;
+      color: #ffffff;
+      height: 46px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .top-bar button {
+      background: none;
+      border: none;
+      color: #ffffff;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 6px 10px;
+    }
+    .top-bar button:active {
+      opacity: 0.6;
+    }
+
+    /* 2. 月間サマリーバー（収入・支出・月間収支） */
+    .summary-bar {
+      background-color: #e0e0e0;
+      border-bottom: 1px solid #bdbdbd;
+      padding: 6px 8px;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .val-blue {
+      color: #1a237e;
+      font-weight: bold;
+    }
+    .val-red {
+      color: #d32f2f;
+      font-weight: bold;
+    }
+    .summary-bar .monthly-total {
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    /* 3. カレンダーグリッド */
+    .calendar-header {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      background-color: #8c8c8c;
+      border-bottom: 1px solid #757575;
+    }
+    .calendar-header div {
+      text-align: center;
+      font-size: 12px;
+      font-weight: bold;
+      padding: 4px 0;
+      border-right: 1px solid #a0a0a0;
+      color: #111;
+    }
+    .calendar-header div:first-child { color: #d50000; }
+    .calendar-header div:last-child { color: #0000ff; border-right: none; }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      border-bottom: 1px solid #bdbdbd;
+    }
+    .day-cell {
+      height: 56px;
+      border-right: 1px solid #dcdcdc;
+      border-bottom: 1px solid #dcdcdc;
+      padding: 3px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      cursor: pointer;
+      background-color: #fff;
+      position: relative;
+    }
+    .day-cell:nth-child(7n) {
+      border-right: none;
+    }
+    .day-cell.selected {
+      background-color: #fff9c4;
+      outline: 2px solid #fbc02d;
+      z-index: 1;
+    }
+    .day-cell.other-month {
+      background-color: #fafafa;
+    }
+    .day-num {
+      text-align: right;
+      font-size: 12px;
+      font-weight: bold;
+      line-height: 1;
+    }
+    .day-num.sun { color: #d50000; }
+    .day-num.sat { color: #0000ff; }
+    .day-num.other { color: #bdbdbd; font-weight: normal; }
+
+    .cat-tag {
+      display: inline-block;
+      font-size: 9px;
+      background-color: #e8eaf6;
+      color: #1a237e;
+      border: 1px solid #9fa8da;
+      border-radius: 2px;
+      padding: 0 2px;
+      line-height: 1.2;
+      max-width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .day-amount {
+      text-align: right;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: -0.5px;
+      line-height: 1.1;
+    }
+    .amt-plus { color: #1a237e; }
+    .amt-minus { color: #d50000; }
+
+    /* 4. 選択日の詳細バー */
+    .selected-day-bar {
+      background-color: #eeeeee;
+      border-bottom: 1px solid #bdbdbd;
+      padding: 6px 8px;
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+    }
+    .selected-info-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .btn-edit-small {
+      background-color: #616161;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: bold;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* 5. 収支グラフエリア */
+    .chart-area {
+      padding: 8px 6px 16px;
+      background-color: #ffffff;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    canvas {
+      width: 100%;
+      max-width: 460px;
+      height: 210px;
+    }
+
+    /* 6. 入力ダイアログ */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+      z-index: 100;
+    }
+    .modal-dialog {
+      background: #fff;
+      width: 100%;
+      max-width: 360px;
+      border-radius: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      overflow: hidden;
+    }
+    .modal-title {
+      background: #757575;
+      color: #fff;
+      padding: 12px 14px;
+      font-size: 15px;
+      font-weight: bold;
+    }
+    .modal-body {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 13px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-group input, .form-group select {
+      padding: 9px;
+      border: 1px solid #999;
+      border-radius: 4px;
+      font-size: 16px; /* スマホで自動ズームされないサイズ */
+    }
+    .modal-footer {
+      display: flex;
+      border-top: 1px solid #ddd;
+    }
+    .modal-footer button {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      background: #f5f5f5;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      border-right: 1px solid #ddd;
+    }
+    .modal-footer button:last-child { border-right: none; }
+    .modal-footer button.btn-save { color: #1a237e; }
+    .modal-footer button.btn-del { color: #d50000; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="app-shell">
+  <!-- トップヘッダー -->
+  <header class="top-bar">
+    <button id="today-btn" title="今月に戻る">≡</button>
+    <div id="month-label">2026/11</div>
+    <div>
+      <button id="prev-month-btn">＜</button>
+      <button id="open-modal-btn" title="選択日を入力">📅</button>
+      <button id="next-month-btn">＞</button>
+    </div>
+    <div style="width: 24px;"></div>
+  </header>
+
+  <!-- 月間サマリーバー -->
+  <div class="summary-bar">
+    <span>収入:<span id="total-income" class="val-blue">0円</span></span>
+    <span>支出:<span id="total-expense" class="val-red">0円</span></span>
+    <span>月間収支: <span id="monthly-total" class="monthly-total val-blue">0円</span></span>
+  </div>
+
+  <!-- 曜日ヘッダー -->
+  <div class="calendar-header">
+    <div>日</div>
+    <div>月</div>
+    <div>火</div>
+    <div>水</div>
+    <div>木</div>
+    <div>金</div>
+    <div>土</div>
+  </div>
+
+  <!-- カレンダー本体 -->
+  <div class="calendar-grid" id="calendar-grid"></div>
+
+  <!-- 選択日ステータスバー -->
+  <div class="selected-day-bar">
+    <span class="selected-info-text" id="selected-info">--/-- 記録なし</span>
+    <button class="btn-edit-small" id="quick-edit-btn">入力・編集</button>
+  </div>
+
+  <!-- 日別収支の棒グラフ＆累計折れ線グラフ -->
+  <div class="chart-area">
+    <canvas id="balance-chart" width="460" height="210"></canvas>
+  </div>
+</div>
+
+<!-- お小遣い入力ダイアログ -->
+<div class="modal-overlay hidden" id="entry-modal">
+  <div class="modal-dialog">
+    <div class="modal-title" id="modal-date-title">お小遣い記録</div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>種別</label>
+        <select id="entry-type">
+          <option value="expense">支出（使ったお金・赤字）</option>
+          <option value="income">収入（お小遣い・臨時収入・青字）</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>金額（円）</label>
+        <input type="number" id="amount-input" placeholder="1000" inputmode="numeric" min="0">
+      </div>
+      <div class="form-group">
+        <label>カテゴリー</label>
+        <select id="category-input">
+          <option value="食費">食費・カフェ</option>
+          <option value="趣味">趣味・娯楽</option>
+          <option value="日用品">日用品</option>
+          <option value="交際費">交際費</option>
+          <option value="お小遣い">お小遣い・給料</option>
+          <option value="その他">その他</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>メモ</label>
+        <input type="text" id="memo-input" placeholder="例：ランチ、お小遣い">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button id="delete-entry-btn" class="btn-del">削除</button>
+      <button id="cancel-modal-btn">閉じる</button>
+      <button id="save-entry-btn" class="btn-save">登録</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // 最初は空っぽ（自分のブラウザにだけデータが保存されます）
+  let records = JSON.parse(localStorage.getItem('my_okozukai_data_v1')) || {};
+
+  const now = new Date();
+  let currentYear = now.getFullYear();
+  let currentMonth = now.getMonth();
+  let selectedDateStr = formatDateKey(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const monthLabel = document.getElementById('month-label');
+  const calendarGrid = document.getElementById('calendar-grid');
+  const totalIncomeEl = document.getElementById('total-income');
+  const totalExpenseEl = document.getElementById('total-expense');
+  const monthlyTotalEl = document.getElementById('monthly-total');
+  const selectedInfoEl = document.getElementById('selected-info');
+  const canvas = document.getElementById('balance-chart');
+  const ctx = canvas.getContext('2d');
+
+  const entryModal = document.getElementById('entry-modal');
+  const modalDateTitle = document.getElementById('modal-date-title');
+  const entryType = document.getElementById('entry-type');
+  const amountInput = document.getElementById('amount-input');
+  const categoryInput = document.getElementById('category-input');
+  const memoInput = document.getElementById('memo-input');
+
+  function formatDateKey(y, m, d) {
+    return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  }
+
+  document.getElementById('prev-month-btn').addEventListener('click', () => {
+    currentMonth--;
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    renderAll();
+  });
+
+  document.getElementById('next-month-btn').addEventListener('click', () => {
+    currentMonth++;
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    renderAll();
+  });
+
+  document.getElementById('today-btn').addEventListener('click', () => {
+    const t = new Date();
+    currentYear = t.getFullYear();
+    currentMonth = t.getMonth();
+    selectedDateStr = formatDateKey(currentYear, currentMonth, t.getDate());
+    renderAll();
+  });
+
+  function openModal(dateStr) {
+    selectedDateStr = dateStr;
+    renderCalendar();
+    updateSelectedBar();
+
+    modalDateTitle.textContent = `${dateStr.replace(/-/g, '/')} の記録`;
+    const existing = records[dateStr];
+    if (existing) {
+      if (existing.income > 0 && existing.expense === 0) {
+        entryType.value = 'income';
+        amountInput.value = existing.income;
+      } else {
+        entryType.value = 'expense';
+        amountInput.value = existing.expense || Math.abs(existing.diff);
+      }
+      categoryInput.value = existing.category || '食費';
+      memoInput.value = existing.memo || '';
+    } else {
+      entryType.value = 'expense';
+      amountInput.value = '';
+      categoryInput.value = '食費';
+      memoInput.value = '';
+    }
+    entryModal.classList.remove('hidden');
+  }
+
+  document.getElementById('open-modal-btn').addEventListener('click', () => openModal(selectedDateStr));
+  document.getElementById('quick-edit-btn').addEventListener('click', () => openModal(selectedDateStr));
+  document.getElementById('cancel-modal-btn').addEventListener('click', () => entryModal.classList.add('hidden'));
+
+  document.getElementById('save-entry-btn').addEventListener('click', () => {
+    const type = entryType.value;
+    const amt = Number(amountInput.value) || 0;
+    const category = categoryInput.value;
+    const memo = memoInput.value;
+
+    const income = type === 'income' ? amt : 0;
+    const expense = type === 'expense' ? amt : 0;
+    const diff = income - expense;
+
+    records[selectedDateStr] = { income, expense, diff, category, memo };
+    saveRecords();
+    entryModal.classList.add('hidden');
+    renderAll();
+  });
+
+  document.getElementById('delete-entry-btn').addEventListener('click', () => {
+    delete records[selectedDateStr];
+    saveRecords();
+    entryModal.classList.add('hidden');
+    renderAll();
+  });
+
+  function saveRecords() {
+    localStorage.setItem('my_okozukai_data_v1', JSON.stringify(records));
+  }
+
+  function renderCalendar() {
+    monthLabel.textContent = `${currentYear}/${String(currentMonth + 1).padStart(2, '0')}`;
+    calendarGrid.innerHTML = '';
+
+    const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const prevMonthDays = new Date(currentYear, currentMonth, 0).getDate();
+
+    for (let i = 0; i < 42; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'day-cell';
+
+      let y = currentYear;
+      let m = currentMonth;
+      let d = 0;
+      let isOther = false;
+
+      if (i < firstDay) {
+        d = prevMonthDays - firstDay + i + 1;
+        m = currentMonth - 1;
+        if (m < 0) { m = 11; y--; }
+        isOther = true;
+      } else if (i >= firstDay + daysInMonth) {
+        d = i - (firstDay + daysInMonth) + 1;
+        m = currentMonth + 1;
+        if (m > 11) { m = 0; y++; }
+        isOther = true;
+      } else {
+        d = i - firstDay + 1;
+      }
+
+      const dateKey = formatDateKey(y, m, d);
+      if (isOther) cell.classList.add('other-month');
+      if (dateKey === selectedDateStr) cell.classList.add('selected');
+
+      const dayOfWeek = i % 7;
+      let numClass = 'day-num';
+      if (isOther) numClass += ' other';
+      else if (dayOfWeek === 0) numClass += ' sun';
+      else if (dayOfWeek === 6) numClass += ' sat';
+
+      const rec = records[dateKey];
+      let contentHTML = `<div class="${numClass}">${d}</div>`;
+
+      if (rec) {
+        if (rec.diff > 0) {
+          contentHTML += `
+            <div>
+              <div class="cat-tag">${rec.category || '収入'}</div>
+              <div class="day-amount amt-plus">+${rec.diff}</div>
+            </div>
+          `;
+        } else if (rec.diff < 0) {
+          contentHTML += `<div class="day-amount amt-minus">${rec.diff}</div>`;
+        } else {
+          contentHTML += `<div class="day-amount">0</div>`;
+        }
+      }
+
+      cell.innerHTML = contentHTML;
+      cell.addEventListener('click', () => {
+        if (selectedDateStr === dateKey) {
+          openModal(dateKey);
+        } else {
+          selectedDateStr = dateKey;
+          renderCalendar();
+          updateSelectedBar();
+        }
+      });
+
+      calendarGrid.appendChild(cell);
+    }
+  }
+
+  function updateMonthlySummary() {
+    const prefix = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+    let sumIncome = 0;
+    let sumExpense = 0;
+
+    Object.keys(records).forEach(key => {
+      if (key.startsWith(prefix)) {
+        sumIncome += records[key].income || 0;
+        sumExpense += records[key].expense || 0;
+      }
+    });
+
+    const net = sumIncome - sumExpense;
+    totalIncomeEl.textContent = `${sumIncome.toLocaleString()}円`;
+    totalExpenseEl.textContent = `${sumExpense.toLocaleString()}円`;
+
+    monthlyTotalEl.textContent = `${net >= 0 ? '+' : ''}${net.toLocaleString()}円`;
+    monthlyTotalEl.className = `monthly-total ${net >= 0 ? 'val-blue' : 'val-red'}`;
+  }
+
+  function updateSelectedBar() {
+    const parts = selectedDateStr.split('-');
+    const shortDate = `${Number(parts[1])}/${Number(parts[2])}`;
+    const rec = records[selectedDateStr];
+
+    if (!rec) {
+      selectedInfoEl.textContent = `${shortDate} 記録なし`;
+    } else {
+      const sign = rec.diff > 0 ? '+' : '';
+      const memoText = rec.memo ? `（${rec.memo}）` : '';
+      selectedInfoEl.textContent = `${shortDate} [${rec.category}] ${sign}${rec.diff.toLocaleString()}円 ${memoText}`;
+    }
+  }
+
+  function renderChart() {
+    const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const dailyDiffs = [];
+    const cumDiffs = [];
+    let runningTotal = 0;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = formatDateKey(currentYear, currentMonth, d);
+      const diff = records[key] ? records[key].diff : 0;
+      dailyDiffs.push(diff);
+      runningTotal += diff;
+      cumDiffs.push(runningTotal);
+    }
+
+    const allValues = [...dailyDiffs, ...cumDiffs, 10000, -10000];
+    const stepUnit = 10000;
+    const maxVal = Math.ceil(Math.max(...allValues) / stepUnit) * stepUnit;
+    const minVal = Math.floor(Math.min(...allValues) / stepUnit) * stepUnit;
+    const range = maxVal - minVal || 20000;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    const padLeft = 52;
+    const padRight = 14;
+    const padTop = 14;
+    const padBottom = 24;
+    const plotW = w - padLeft - padRight;
+    const plotH = h - padTop - padBottom;
+
+    ctx.clearRect(0, 0, w, h);
+
+    const getY = (val) => padTop + ((maxVal - val) / range) * plotH;
+    const getX = (dayIdx) => padLeft + (dayIdx / (daysInMonth - 1)) * plotW;
+
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+
+    const gridStep = range > 60000 ? 30000 : 10000;
+    for (let v = minVal; v <= maxVal; v += gridStep) {
+      const y = getY(v);
+      ctx.strokeStyle = v === 0 ? '#999' : '#e0e0e0';
+      ctx.setLineDash(v === 0 ? [] : [3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(padLeft, y);
+      ctx.lineTo(w - padRight, y);
+      ctx.stroke();
+
+      ctx.fillStyle = '#555';
+      ctx.fillText(v.toLocaleString(), padLeft - 6, y);
+    }
+    ctx.setLineDash([]);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    [5, 10, 15, 20, 25, 30].forEach(day => {
+      if (day <= daysInMonth) {
+        const x = getX(day - 1);
+        ctx.fillStyle = '#555';
+        ctx.fillText(day, x, h - padBottom + 5);
+      }
+    });
+
+    const zeroY = getY(0);
+    const barW = Math.max(4, (plotW / daysInMonth) * 0.55);
+
+    dailyDiffs.forEach((val, idx) => {
+      if (val === 0) return;
+      const x = getX(idx) - barW / 2;
+      const y = getY(val);
+      ctx.fillStyle = val > 0 ? '#1a237e' : '#d50000';
+      if (val > 0) {
+        ctx.fillRect(x, y, barW, zeroY - y);
+      } else {
+        ctx.fillRect(x, zeroY, barW, y - zeroY);
+      }
+    });
+
+    ctx.strokeStyle = '#004d40';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    cumDiffs.forEach((val, idx) => {
+      const x = getX(idx);
+      const y = getY(val);
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    cumDiffs.forEach((val, idx) => {
+      const x = getX(idx);
+      const y = getY(val);
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#004d40';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+
+    ctx.fillStyle = '#555';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`日別収支 - ${currentYear}年${currentMonth + 1}月`, w - padRight, h - 14);
+  }
+
+  function renderAll() {
+    renderCalendar();
+    updateMonthlySummary();
+    updateSelectedBar();
+    renderChart();
+  }
+
+  renderAll();
+</script>
+</body>
+</html>
